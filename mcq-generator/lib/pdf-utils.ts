@@ -309,13 +309,7 @@ export function generatePDF(questions: GeneratedQuestion[], title: string = "Gen
       yPosition += lineHeight * 0.8;
       
       // Add subtitle for timing
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "italic");
-      const timingText = index < 10 ? "(Revised last week)" : 
-                        index < 20 ? "(Revised 2-3 weeks ago)" : 
-                        "(Revised 4+ weeks ago)";
-      doc.text(timingText, margin, yPosition);
-      yPosition += lineHeight * 2;
+     
       
       // Reset to normal font
       doc.setFontSize(11);
