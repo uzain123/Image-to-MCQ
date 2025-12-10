@@ -352,203 +352,48 @@ export async function generateTopicQuestions(
 
     const levelDisplay = educationLevel === "GCSE" ? "GCSE" : "A-Level";
 
-    const prompt = `You are generating exam-standard multiple-choice questions for ONE topic of a ${levelDisplay} retrieval quiz.
+    const prompt = `You are generating a ready-to-use ${levelDisplay} retrieval quiz. Treat this as a final deliverable that students can use immediately.
 
-=====================
-CRITICAL INSTRUCTIONS
-=====================
+🔹 Format Requirements
+Plain text only (no markdown, tables, or images). 
+Generate EXACTLY 10 multiple-choice questions for ONE topic based on the submitted revision-guide image.
+Analyze the uploaded image and infer the topic title (e.g., "Uncertainties and Evaluations", "Reactions of Acids").
+Do NOT add numbering, labels, or prefixes such as "Topic A".
 
-1) Analyze the uploaded image and infer the topic.
-   - Produce a short, descriptive topic title (e.g., "Uncertainties and Evaluations", "Reactions of Acids").
-   - Do NOT add numbering, labels, or prefixes such as "Topic A".
+🔹 Question Structure
+Each topic must include: 
+5 AO1 questions (recall of facts/content). 
+5 AO2 questions (application/data/one-sentence cause-effect reasoning). 
+Each question must: 
+Be multiple choice with 1 correct answer + 3 plausible distractors. 
+Be short and answerable in under 30 seconds. 
+Have only one unambiguously correct answer. 
+Use distractors that reflect real misconceptions, not obviously incorrect ideas and test their deep conceptual understanding of the topic
 
-2) Generate EXACTLY 10 MCQs:
-   - Questions 1–5 = AO1 (pure recall)
-   - Questions 6–10 = AO2 (application ONLY)
+🔹 AO2 Question Requirements
+AO2 questions (questions 6–10 in each topic) must include:
+Application of knowledge to an unfamiliar example, OR 
+Interpretation of data, OR 
+A one-sentence cause/effect or "why" question (multiple choice format). 
+Avoid AO3 evaluative or essay-style questions.
 
-3) Use THIS answer sequence STRICTLY: "${answerSequence}"
-   - Q1 correct answer = index of '${answerSequence[0]}' (a=0, b=1, c=2, d=3)
-   - Continue the same for all 10 questions.
+❗ Do NOT:
+Label which option is correct. 
+Mention which questions are AO1/AO2 in the quiz. 
+Add any explanations in the quiz.
 
-
-
-=========================================
-AO1 QUESTIONS (Q1–Q5) - PURE RECALL
-=========================================
-
-These MUST be straightforward recall questions:
-✓ "What is [definition]?"
-✓ "Which term means [concept]?"
-✓ "Define [term]"
-✓ "What does [term] mean?"
-✓ "Which organelle/process/element [simple fact]?"
-
-Examples:
-• "What is the function of mitochondria?"
-• "Which scientist discovered electrons?"
-• "Define the term 'catalyst'."
-
-❌ DO NOT include reasoning, scenarios, or calculations in AO1.
-
-=========================================
-AO2 QUESTIONS (Q6–Q10) - APPLICATION ONLY
-=========================================
-
-FOR AO2 QUESTIONS (Q6–Q10) — STRICT REQUIREMENTS
-
-Every AO2 question MUST:
-1. Be based on an applied scenario (mandatory)
-2. Include either:
-   - numerical data,
-   - an experiment setup,
-   - observations,
-   - measurements,
-   - or a real-world context.
-3. Follow one of the templates:
-   T1: Numerical calculation
-   T2: Experimental observation
-   T3: Real-world applied situation
-   T4: Data/graph/table interpretation
-4. Begin with one of these mandatory AO2 openers:
-   "A student measures..."
-   "A student observes..."
-   "In an experiment..."
-   "A force of..."
-   "A sample shows..."
-   "A reading of..."
-   "During a reaction..."
-5. Use only application verbs:
-   calculate, determine, predict, interpret, use the data
-6. Do NOT ask conceptual-only questions.
-7. If an AO2 question lacks data OR an experiment, it is INVALID and must be regenerated.
-
-=========================================
-EXACT AO2 EXAMPLES TO FOLLOW
-=========================================
-
-**Topic: Uncertainties and Evaluations**
-
-✅ GOOD AO2 (USE THESE AS TEMPLATES):
-
-"A student measures three readings: 19.8 cm3, 20.1 cm3, and 20.0 cm3. What is the range?"
-a) 0.3 cm3
-b) 0.2 cm3
-c) 0.4 cm3
-d) 0.1 cm3
-
-"If a titration has a mean of 19.97 cm3 and an uncertainty of ±0.15 cm3, which result best expresses the mean?"
-a) 19.97 cm3 ± 0.15 cm3
-b) 19.97 ± 0.30 cm3
-c) 20.00 ± 0.15 cm3
-d) 19.97 ± 0.10 cm3
-
-"A larger number of measurements is taken in an experiment. How does this affect uncertainty?"
-a) Increases uncertainty
-b) Has no effect
-c) Reduces uncertainty in the mean
-d) Makes results less accurate
-
-"Why should you comment on the validity of the method in an evaluation?"
-a) To decide if the results were random
-b) To check if the investigation was fair
-c) To calculate the uncertainty
-d) To identify the range of data
-
-"In an enzyme experiment, why would taking more readings around the optimum temperature improve results?"
-a) It increases errors
-b) It helps find a more accurate optimum value
-c) It changes the enzyme's structure
-d) It removes all uncertainty
-
-**Topic: Reactions of Acids**
-
-✅ GOOD AO2:
-
-"When copper oxide reacts with hydrochloric acid, what salt is formed?"
-a) Copper sulfate
-b) Copper nitrate
-c) Copper chloride
-d) Copper carbonate
-
-"A student reacts sulfuric acid with sodium carbonate. What products form?"
-a) Sodium sulfate, water, and carbon dioxide
-b) Sodium chloride and water
-c) Sodium nitrate and hydrogen
-d) Sodium hydroxide and carbon dioxide
-
-"Why is the acid warmed gently before adding an insoluble base?"
-a) To speed up the reaction
-b) To evaporate the acid
-c) To cool the mixture
-d) To prevent salt formation
-
-"After filtering a salt solution, why is it heated in a water bath rather than directly on a flame?"
-a) To prevent decomposition of the salt
-b) To make it boil faster
-c) To remove impurities
-d) To mix the acid and base better
-
-"In the reaction between nitric acid and potassium hydroxide, what products are formed?"
-a) Potassium nitrate and water
-b) Potassium sulfate and carbon dioxide
-c) Potassium oxide and hydrogen
-d) Potassium chloride and oxygen
-
-**Topic: Ionic Bonding**
-
-✅ GOOD AO2 (NOTE THE PLAIN TEXT NOTATION):
-
-"A student observes sodium and chlorine reacting. What happens to sodium's electrons?"
-a) Gains one
-b) Gains two
-c) Loses one
-d) Loses two
-
-"In an experiment, magnesium reacts with oxygen. What is formed?"
-a) MgO
-b) MgCl2
-c) MgO2
-d) MgC
-
-"Why are ionic compounds usually solid at room temperature?"
-a) Weak forces
-b) High energy
-c) Strong electrostatic forces
-d) Low melting point
-
-"A student draws a dot and cross diagram for NaCl. What should the Cl atom show?"
-a) One electron gained
-b) Two electrons gained
-c) Eight electrons total
-d) Seven electrons originally
-
-"During the formation of MgCl2, how many electrons does each chlorine atom gain?"
-a) Two electrons
-b) Three electrons
-c) One electron
-d) No electrons
-
-
-=========================================
-❌ WEAK AO2 EXAMPLES (DO NOT CREATE)
-=========================================
-
-❌ "Why do electrons orbit the nucleus?" (conceptual, not applied)
-❌ "What is respiration?" (this is AO1 recall)
-❌ "Define metabolism" (this is AO1 recall)
-❌ "Which organelle produces energy?" (simple recall)
-❌ "What does enzyme mean?" (definition, not application)
-
-=========================================
-FORMAT REQUIREMENTS
-=========================================
-
-- Each question = 1-2 sentences maximum
-- All answer options = concise (5-10 words)
-- Distractors = plausible misconceptions
-- Questions must relate to the image content
-- No markdown, no explanations
-- PLAIN TEXT ONLY - no special characters
+📎 Requirements For Answers
+Use THIS answer sequence STRICTLY: "${answerSequence}"
+- Q1 correct answer = index of '${answerSequence[0]}' (a=0, b=1, c=2, d=3)
+- Q2 correct answer = index of '${answerSequence[1]}' (a=0, b=1, c=2, d=3)
+- Continue the same for all 10 questions.
+The position of the correct answer should be random
+The correct answer for a particular question should never be in the same position as the previous question
+Do not show any planning steps.
+You must plan and lock the distribution of answer positions BEFORE writing the questions.
+Do not change the distribution during writing.
+Do not list or label which answers are correct until the answer key.
+If the constraints cannot be met, you must correct yourself before outputting the quiz.
 
 =====================
 OUTPUT FORMAT (STRICT)
