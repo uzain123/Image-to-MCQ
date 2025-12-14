@@ -1,117 +1,13 @@
 // ============================================================================
 // FILE: components/ImageUploader.tsx
-// CURRENT: Vercel Blob Storage Implementation
-// OLD: Base64 Implementation (commented below for local testing)
+// UPDATED WITH IMAGE COMPRESSION
 // ============================================================================
 
 'use client';
 
 import { useState } from 'react';
 import { Upload, X, ChevronUp, ChevronDown } from 'lucide-react';
-
-// ============================================================================
-// OLD IMPLEMENTATION (BASE64) - UNCOMMENT FOR LOCAL TESTING WITHOUT VERCEL BLOB
-// ============================================================================
-/*
-// OLD handleFiles function - converts to base64 directly
-const handleFilesOLD = async (files: FileList) => {
-  const fileArray = Array.from(files);
-  
-  if (!multipleImages && fileArray.length > 0) {
-    await handleSingleFileOLD(fileArray[0]);
-    return;
-  }
-
-  const validFiles = fileArray.filter(file => file.type.startsWith('image/'));
-  
-  if (validFiles.length === 0) {
-    alert('Please upload image files');
-    return;
-  }
-
-  if (previews.length + validFiles.length > maxImages) {
-    alert(`Maximum ${maxImages} images allowed`);
-    return;
-  }
-
-  // Check individual file sizes
-  const oversizedFiles = validFiles.filter(file => file.size > 10 * 1024 * 1024);
-  if (oversizedFiles.length > 0) {
-    alert('Some images are too large (>10MB). Please choose smaller images.');
-    return;
-  }
-
-  setIsCompressing(true);
-  
-  try {
-    // Convert original files to base64
-    const readers = validFiles.map(file => {
-      return new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.onerror = (e) => reject(new Error('Failed to read file'));
-        reader.readAsDataURL(file);
-      });
-    });
-
-    const base64Array = await Promise.all(readers);
-    
-    // Log total size
-    const totalSize = base64Array.reduce((sum, b64) => sum + b64.length, 0);
-    console.log('📊 Total base64 size (original):', (totalSize / 1024 / 1024).toFixed(2), 'MB');
-
-    const newPreviews = [...previews, ...base64Array];
-    setPreviews(newPreviews);
-    onImageUpload(newPreviews);
-  } catch (error) {
-    alert(error instanceof Error ? error.message : 'Failed to process images');
-  } finally {
-    setIsCompressing(false);
-  }
-};
-
-// OLD handleSingleFile function - converts to base64 directly
-const handleSingleFileOLD = async (file: File) => {
-  if (!file.type.startsWith('image/')) {
-    alert('Please upload an image file');
-    return;
-  }
-
-  if (file.size > 10 * 1024 * 1024) {
-    alert('Image is too large (>10MB). Please choose a smaller image.');
-    return;
-  }
-
-  setIsCompressing(true);
-
-  try {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64 = e.target?.result as string;
-      
-      const sizeInMB = base64.length / 1024 / 1024;
-      console.log('📊 Original base64 size:', sizeInMB.toFixed(2), 'MB');
-      
-      setPreviews([base64]);
-      onImageUpload(base64);
-      setIsCompressing(false);
-    };
-    reader.onerror = () => {
-      alert('Failed to read image file');
-      setIsCompressing(false);
-    };
-    reader.readAsDataURL(file);
-  } catch (error) {
-    alert(error instanceof Error ? error.message : 'Failed to process image');
-    setIsCompressing(false);
-  }
-};
-
-// TO USE OLD IMPLEMENTATION:
-// 1. Replace handleFiles with handleFilesOLD
-// 2. Replace handleSingleFile with handleSingleFileOLD
-// 3. Change UI text back to "Processing images..." and "max 10MB"
-*/
+import imageCompression from 'browser-image-compression';
 
 interface ImageUploaderProps {
   onImageUpload: (base64: string | string[]) => void;
@@ -166,65 +62,49 @@ export default function ImageUploader({ onImageUpload, multipleImages = false, m
       return;
     }
 
-    // Check individual file sizes - allow larger files since we're using Blob storage
-    const oversizedFiles = validFiles.filter(file => file.size > 50 * 1024 * 1024); // 50MB limit
+    // Check individual file sizes BEFORE compression
+    const oversizedFiles = validFiles.filter(file => file.size > 10 * 1024 * 1024);
     if (oversizedFiles.length > 0) {
-      alert('Some images are too large (>50MB). Please choose smaller images.');
+      alert('Some images are too large (>10MB). Please choose smaller images.');
       return;
     }
 
     setIsCompressing(true);
     
     try {
-      console.log('📤 Uploading images to Vercel Blob...');
-      
-      // Upload raw files to Vercel Blob
-      const formData = new FormData();
-      validFiles.forEach(file => {
-        formData.append('images', file);
-      });
+      // NO COMPRESSION - Use original files directly
+      // const compressedFiles = await Promise.all(
+      //   validFiles.map(file => compressImage(file))
+      // );
 
-      const uploadResponse = await fetch('/api/upload-images', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
-        throw new Error(errorData.error || 'Failed to upload images');
-      }
-
-      const { imageUrls, fallbackUsed, developmentMode } = await uploadResponse.json();
-      
-      if (fallbackUsed) {
-        console.log('⚠️ Using base64 fallback due to Blob storage issue');
-      } else if (developmentMode) {
-        console.log('🔧 Using base64 for local development');
-      } else {
-        console.log('✅ Images uploaded successfully to Vercel Blob:', imageUrls);
-      }
-
-      // Create preview URLs for display (using the original files)
-      const previewPromises = validFiles.map(file => {
+      // Convert original files to base64
+      const readers = validFiles.map(file => {
         return new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (e) => resolve(e.target?.result as string);
-          reader.onerror = () => reject(new Error('Failed to read file'));
+          reader.onerror = (e) => reject(new Error('Failed to read file'));
           reader.readAsDataURL(file);
         });
       });
 
-      const previewUrls = await Promise.all(previewPromises);
+      const base64Array = await Promise.all(readers);
       
-      const newPreviews = [...previews, ...previewUrls];
+      // Log total size
+      const totalSize = base64Array.reduce((sum, b64) => sum + b64.length, 0);
+      console.log('📊 Total base64 size (original):', (totalSize / 1024 / 1024).toFixed(2), 'MB');
+      
+      // Removed size check - allow original file sizes
+      // if (totalSize > 4 * 1024 * 1024) {
+      //   alert('Combined images still too large. Please try smaller or fewer images.');
+      //   setIsCompressing(false);
+      //   return;
+      // }
+
+      const newPreviews = [...previews, ...base64Array];
       setPreviews(newPreviews);
-      
-      // Pass the Blob URLs (not base64) to the parent component
-      onImageUpload(multipleImages ? imageUrls : imageUrls[0]);
-      
+      onImageUpload(newPreviews);
     } catch (error) {
-      console.error('Upload error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to upload images');
+      alert(error instanceof Error ? error.message : 'Failed to process images');
     } finally {
       setIsCompressing(false);
     }
@@ -236,60 +116,44 @@ export default function ImageUploader({ onImageUpload, multipleImages = false, m
       return;
     }
 
-    // Check file size - allow larger files since we're using Blob storage
-    if (file.size > 50 * 1024 * 1024) {
-      alert('Image is too large (>50MB). Please choose a smaller image.');
+    // Check file size BEFORE compression
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image is too large (>10MB). Please choose a smaller image.');
       return;
     }
 
     setIsCompressing(true);
 
     try {
-      console.log('📤 Uploading single image to Vercel Blob...');
+      // NO COMPRESSION - Use original file directly
+      // const compressedFile = await compressImage(file);
       
-      // Upload raw file to Vercel Blob
-      const formData = new FormData();
-      formData.append('images', file);
-
-      const uploadResponse = await fetch('/api/upload-images', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
-        throw new Error(errorData.error || 'Failed to upload image');
-      }
-
-      const { imageUrls, fallbackUsed, developmentMode } = await uploadResponse.json();
-      
-      if (fallbackUsed) {
-        console.log('⚠️ Using base64 fallback due to Blob storage issue');
-      } else if (developmentMode) {
-        console.log('🔧 Using base64 for local development');
-      } else {
-        console.log('✅ Single image uploaded successfully to Vercel Blob:', imageUrls[0]);
-      }
-
-      // Create preview URL for display (using the original file)
       const reader = new FileReader();
       reader.onload = (e) => {
-        const previewUrl = e.target?.result as string;
-        setPreviews([previewUrl]);
+        const base64 = e.target?.result as string;
         
-        // Pass the Blob URL (not base64) to the parent component
-        onImageUpload(imageUrls[0]);
+        // Log original file size
+        const sizeInMB = base64.length / 1024 / 1024;
+        console.log('📊 Original base64 size:', sizeInMB.toFixed(2), 'MB');
+        
+        // Removed size check - allow original file sizes
+        // if (sizeInMB > 3.5) {
+        //   alert('Image still too large after compression. Please try a smaller image.');
+        //   setIsCompressing(false);
+        //   return;
+        // }
+        
+        setPreviews([base64]);
+        onImageUpload(base64);
         setIsCompressing(false);
       };
       reader.onerror = () => {
-        alert('Failed to read image file for preview');
+        alert('Failed to read image file');
         setIsCompressing(false);
       };
       reader.readAsDataURL(file);
-      
     } catch (error) {
-      console.error('Upload error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to upload image');
+      alert(error instanceof Error ? error.message : 'Failed to process image');
       setIsCompressing(false);
     }
   };
@@ -359,13 +223,13 @@ export default function ImageUploader({ onImageUpload, multipleImages = false, m
               )}
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-1">
-              {isCompressing ? 'Uploading to cloud storage...' : multipleImages ? 'Upload Multiple Images' : 'Upload Image'}
+              {isCompressing ? 'Compressing images...' : multipleImages ? 'Upload Multiple Images' : 'Upload Image'}
             </h3>
             <p className="text-sm text-gray-600 mb-1">
-              {isCompressing ? 'Uploading to Vercel Blob...' : 'Drag and drop or click to browse'}
+              {isCompressing ? 'Please wait...' : 'Drag and drop or click to browse'}
             </p>
             <p className="text-xs text-gray-500 mb-4">
-              Supports: JPG, PNG, WebP (max 50MB) • Original quality preserved • Cloud storage
+              Supports: JPG, PNG, WebP (max 10MB) • Original quality preserved
             </p>
             {multipleImages && !isCompressing && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 max-w-md">
@@ -503,10 +367,10 @@ export default function ImageUploader({ onImageUpload, multipleImages = false, m
           {isCompressing && (
             <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-800 font-medium">
-                ☁️ Uploading images to cloud storage...
+                📁 Processing images for upload...
               </p>
               <p className="text-xs text-blue-600 mt-1">
-                Using Vercel Blob for optimal performance
+                Converting to base64 format
               </p>
             </div>
           )}

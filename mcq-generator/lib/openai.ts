@@ -176,7 +176,7 @@ async function generateTopicQuestions(
         {
             type: "image_url" as const,
             image_url: {
-                url: image, // Now expects Blob URL instead of base64
+                url: image,
                 detail: "high" as const
             }
         }
