@@ -41,6 +41,8 @@ export default function Home() {
     setQuestions([]);
 
     try {
+      console.log('🚀 Generating quiz with Blob URLs:', imageBase64);
+      
       const response = await fetch('/api/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -54,6 +56,8 @@ export default function Home() {
 
       const data = await response.json();
       setQuestions(data.questions);
+      
+      console.log('✅ Quiz generated successfully using Vercel Blob storage');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {

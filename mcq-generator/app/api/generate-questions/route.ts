@@ -47,6 +47,18 @@ export async function POST(request: NextRequest) {
       console.log(`🎲 Shuffled answer key: ${result.shuffledAnswerKey.join('')}`);
       console.log("=".repeat(60) + "\n");
 
+      // Cleanup images after quiz generation (non-blocking)
+      if (Array.isArray(imageBase64)) {
+        console.log("🧹 Scheduling image cleanup...");
+        fetch('/api/cleanup-images', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrls: imageBase64 })
+        }).catch(error => {
+          console.error("❌ Image cleanup failed:", error);
+        });
+      }
+
       return NextResponse.json({ 
         questions: result.questions,
         originalAnswerKey: result.originalAnswerKey,
