@@ -10,7 +10,7 @@ import { generatePDF, generateAnswerKey } from '@/lib/pdf-utils';
 import { Download, FileText } from 'lucide-react';
 
 export default function Home() {
-  const [imageBase64, setImageBase64] = useState<string | string[]>('');
+  const [uploadedFiles, setUploadedFiles] = useState<File[] | File | null>(null);
   const [config, setConfig] = useState<QuizConfig>({
     questionCount: 10,
     questionType: 'MULTIPLE_CHOICE',
@@ -21,17 +21,15 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const isMultipleImages = config.quizType === 'retrieval';
-
   const handleGenerate = async () => {
-    const hasImages = Array.isArray(imageBase64) ? imageBase64.length > 0 : imageBase64;
-    
-    if (!hasImages) {
-      setError(isMultipleImages ? 'Please upload 3 images (one for each topic)' : 'Please upload an image first');
+    if (!uploadedFiles) {
+      setError('Please upload 3 images (one for each topic)');
       return;
     }
 
-    if (isMultipleImages && Array.isArray(imageBase64) && imageBase64.length !== 3) {
+    const filesArray = Array.isArray(uploadedFiles) ? uploadedFiles : [uploadedFiles];
+    
+    if (filesArray.length !== 3) {
       setError('Retrieval Quiz requires exactly 3 images (Topic A, B, C)');
       return;
     }
@@ -41,10 +39,16 @@ export default function Home() {
     setQuestions([]);
 
     try {
-      const response = await fetch('/api/generate-questions', {
+      // Use R2 workflow for retrieval quizzes
+      const formData = new FormData();
+      filesArray.forEach((file) => {
+        formData.append('images', file);
+      });
+      formData.append('educationLevel', config.educationLevel);
+
+      const response = await fetch('/api/generate-questions-r2', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64, config }),
+        body: formData,
       });
 
       if (!response.ok) {
@@ -128,13 +132,12 @@ export default function Home() {
                 Upload Study Materials
               </h2>
               <ImageUploader 
-                onImageUpload={setImageBase64} 
-                multipleImages={isMultipleImages}
+                onImageUpload={setUploadedFiles} 
+                multipleImages={true}
                 maxImages={3}
               />
             </div>
-            {isMultipleImages && (
-              <div className="bg-blue-600 rounded-xl shadow-md p-5 text-white">
+            <div className="bg-blue-600 rounded-xl shadow-md p-5 text-white">
                 <div className="flex items-start gap-3">
                   <span className="text-2xl flex-shrink-0">💡</span>
                   <div>
@@ -147,7 +150,6 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-            )}
           </div>
 
           {/* Right Column - Configuration (35%) */}
@@ -162,7 +164,7 @@ export default function Home() {
             
             <button
               onClick={handleGenerate}
-              disabled={!imageBase64 || loading}
+              disabled={!uploadedFiles || loading}
               className="w-full px-6 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold rounded-xl hover:from-emerald-600 hover:to-emerald-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 text-lg"
             >
               {loading ? (

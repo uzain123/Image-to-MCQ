@@ -1,6 +1,0 @@
-{
-  "type": "module",
-  "dependencies": {
-    "form-data": "^4.0.5"
-  }
-}

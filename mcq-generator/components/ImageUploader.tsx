@@ -7,18 +7,18 @@
 
 import { useState } from 'react';
 import { Upload, X, ChevronUp, ChevronDown } from 'lucide-react';
-import imageCompression from 'browser-image-compression';
 
 interface ImageUploaderProps {
-  onImageUpload: (base64: string | string[]) => void;
+  onImageUpload: (files: File[] | File) => void;
   multipleImages?: boolean;
   maxImages?: number;
 }
 
 export default function ImageUploader({ onImageUpload, multipleImages = false, maxImages = 3 }: ImageUploaderProps) {
   const [previews, setPreviews] = useState<string[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [isCompressing, setIsCompressing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // COMPRESSION DISABLED - Using original files
   // const compressImage = async (file: File): Promise<File> => {
@@ -42,8 +42,8 @@ export default function ImageUploader({ onImageUpload, multipleImages = false, m
   //   }
   // };
 
-  const handleFiles = async (files: FileList) => {
-    const fileArray = Array.from(files);
+  const handleFiles = async (fileList: FileList) => {
+    const fileArray = Array.from(fileList);
     
     if (!multipleImages && fileArray.length > 0) {
       await handleSingleFile(fileArray[0]);
@@ -62,51 +62,33 @@ export default function ImageUploader({ onImageUpload, multipleImages = false, m
       return;
     }
 
-    // Check individual file sizes BEFORE compression
+    // Check individual file sizes
     const oversizedFiles = validFiles.filter(file => file.size > 10 * 1024 * 1024);
     if (oversizedFiles.length > 0) {
       alert('Some images are too large (>10MB). Please choose smaller images.');
       return;
     }
 
-    setIsCompressing(true);
+    setIsProcessing(true);
     
     try {
-      // NO COMPRESSION - Use original files directly
-      // const compressedFiles = await Promise.all(
-      //   validFiles.map(file => compressImage(file))
-      // );
-
-      // Convert original files to base64
-      const readers = validFiles.map(file => {
-        return new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.onerror = (e) => reject(new Error('Failed to read file'));
-          reader.readAsDataURL(file);
-        });
-      });
-
-      const base64Array = await Promise.all(readers);
+      // Create preview URLs for display
+      const previewUrls = validFiles.map(file => URL.createObjectURL(file));
       
-      // Log total size
-      const totalSize = base64Array.reduce((sum, b64) => sum + b64.length, 0);
-      console.log('📊 Total base64 size (original):', (totalSize / 1024 / 1024).toFixed(2), 'MB');
+      // Log file sizes
+      const totalSize = validFiles.reduce((sum, file) => sum + file.size, 0);
+      console.log('📊 Total file size (original):', (totalSize / 1024 / 1024).toFixed(2), 'MB');
       
-      // Removed size check - allow original file sizes
-      // if (totalSize > 4 * 1024 * 1024) {
-      //   alert('Combined images still too large. Please try smaller or fewer images.');
-      //   setIsCompressing(false);
-      //   return;
-      // }
-
-      const newPreviews = [...previews, ...base64Array];
+      const newPreviews = [...previews, ...previewUrls];
+      const newFiles = [...files, ...validFiles];
+      
       setPreviews(newPreviews);
-      onImageUpload(newPreviews);
+      setFiles(newFiles);
+      onImageUpload(newFiles);
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Failed to process images');
     } finally {
-      setIsCompressing(false);
+      setIsProcessing(false);
     }
   };
 
@@ -116,87 +98,90 @@ export default function ImageUploader({ onImageUpload, multipleImages = false, m
       return;
     }
 
-    // Check file size BEFORE compression
     if (file.size > 10 * 1024 * 1024) {
       alert('Image is too large (>10MB). Please choose a smaller image.');
       return;
     }
 
-    setIsCompressing(true);
+    setIsProcessing(true);
 
     try {
-      // NO COMPRESSION - Use original file directly
-      // const compressedFile = await compressImage(file);
+      // Create preview URL for display
+      const previewUrl = URL.createObjectURL(file);
       
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64 = e.target?.result as string;
-        
-        // Log original file size
-        const sizeInMB = base64.length / 1024 / 1024;
-        console.log('📊 Original base64 size:', sizeInMB.toFixed(2), 'MB');
-        
-        // Removed size check - allow original file sizes
-        // if (sizeInMB > 3.5) {
-        //   alert('Image still too large after compression. Please try a smaller image.');
-        //   setIsCompressing(false);
-        //   return;
-        // }
-        
-        setPreviews([base64]);
-        onImageUpload(base64);
-        setIsCompressing(false);
-      };
-      reader.onerror = () => {
-        alert('Failed to read image file');
-        setIsCompressing(false);
-      };
-      reader.readAsDataURL(file);
+      // Log original file size
+      const sizeInMB = file.size / 1024 / 1024;
+      console.log('📊 Original file size:', sizeInMB.toFixed(2), 'MB');
+      
+      setPreviews([previewUrl]);
+      setFiles([file]);
+      onImageUpload(file);
+      setIsProcessing(false);
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Failed to process image');
-      setIsCompressing(false);
+      setIsProcessing(false);
     }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    if (!isCompressing) {
+    if (!isProcessing) {
       handleFiles(e.dataTransfer.files);
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && !isCompressing) {
+    if (e.target.files && !isProcessing) {
       handleFiles(e.target.files);
     }
   };
 
   const removeImage = (index: number) => {
+    // Revoke the object URL to prevent memory leaks
+    URL.revokeObjectURL(previews[index]);
+    
     const newPreviews = previews.filter((_, i) => i !== index);
+    const newFiles = files.filter((_, i) => i !== index);
+    
     setPreviews(newPreviews);
-    onImageUpload(multipleImages ? newPreviews : (newPreviews[0] || ''));
+    setFiles(newFiles);
+    onImageUpload(multipleImages ? newFiles : (newFiles[0] || (null as any)));
   };
 
   const clearAllImages = () => {
+    // Revoke all object URLs
+    previews.forEach(url => URL.revokeObjectURL(url));
+    
     setPreviews([]);
-    onImageUpload(multipleImages ? [] : '');
+    setFiles([]);
+    onImageUpload(multipleImages ? [] : (null as any));
   };
 
   const moveImageUp = (index: number) => {
     if (index === 0) return; // Already at the top
     const newPreviews = [...previews];
+    const newFiles = [...files];
+    
     [newPreviews[index - 1], newPreviews[index]] = [newPreviews[index], newPreviews[index - 1]];
+    [newFiles[index - 1], newFiles[index]] = [newFiles[index], newFiles[index - 1]];
+    
     setPreviews(newPreviews);
-    onImageUpload(newPreviews);
+    setFiles(newFiles);
+    onImageUpload(newFiles);
   };
 
   const moveImageDown = (index: number) => {
     if (index === previews.length - 1) return; // Already at the bottom
     const newPreviews = [...previews];
+    const newFiles = [...files];
+    
     [newPreviews[index], newPreviews[index + 1]] = [newPreviews[index + 1], newPreviews[index]];
+    [newFiles[index], newFiles[index + 1]] = [newFiles[index + 1], newFiles[index]];
+    
     setPreviews(newPreviews);
-    onImageUpload(newPreviews);
+    setFiles(newFiles);
+    onImageUpload(newFiles);
   };
 
   return (
@@ -210,28 +195,28 @@ export default function ImageUploader({ onImageUpload, multipleImages = false, m
             isDragging 
               ? 'border-indigo-500 bg-indigo-50 scale-[1.02]' 
               : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
-          } ${isCompressing ? 'opacity-50 cursor-wait' : ''}`}
+          } ${isProcessing ? 'opacity-50 cursor-wait' : ''}`}
         >
           <div className="flex flex-col items-center">
             <div className={`p-4 rounded-full mb-4 transition-colors ${
               isDragging ? 'bg-indigo-100' : 'bg-gray-100'
             }`}>
-              {isCompressing ? (
+              {isProcessing ? (
                 <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
               ) : (
                 <Upload className={`w-8 h-8 ${isDragging ? 'text-indigo-600' : 'text-gray-400'}`} />
               )}
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-1">
-              {isCompressing ? 'Compressing images...' : multipleImages ? 'Upload Multiple Images' : 'Upload Image'}
+              {isProcessing ? 'Processing images...' : multipleImages ? 'Upload Multiple Images' : 'Upload Image'}
             </h3>
             <p className="text-sm text-gray-600 mb-1">
-              {isCompressing ? 'Please wait...' : 'Drag and drop or click to browse'}
+              {isProcessing ? 'Please wait...' : 'Drag and drop or click to browse'}
             </p>
             <p className="text-xs text-gray-500 mb-4">
               Supports: JPG, PNG, WebP (max 10MB) • Original quality preserved
             </p>
-            {multipleImages && !isCompressing && (
+            {multipleImages && !isProcessing && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 max-w-md">
                 <p className="text-xs text-blue-800 font-medium">
                   📚 Retrieval Quiz requires 3 images:
@@ -248,12 +233,12 @@ export default function ImageUploader({ onImageUpload, multipleImages = false, m
               onChange={handleChange}
               className="hidden"
               id="file-upload"
-              disabled={isCompressing}
+              disabled={isProcessing}
             />
             <label
               htmlFor="file-upload"
               className={`px-6 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg cursor-pointer hover:bg-indigo-700 active:scale-95 transition-all duration-150 shadow-sm hover:shadow-md ${
-                isCompressing ? 'opacity-50 cursor-wait pointer-events-none' : ''
+                isProcessing ? 'opacity-50 cursor-wait pointer-events-none' : ''
               }`}
             >
               Choose {multipleImages ? 'Images' : 'Image'}
@@ -273,7 +258,7 @@ export default function ImageUploader({ onImageUpload, multipleImages = false, m
               <button
                 onClick={clearAllImages}
                 className="text-sm text-red-600 hover:text-red-700 font-medium transition-colors"
-                disabled={isCompressing}
+                disabled={isProcessing}
               >
                 Clear All
               </button>
@@ -309,7 +294,7 @@ export default function ImageUploader({ onImageUpload, multipleImages = false, m
                   <div className="absolute bottom-3 left-3 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-150">
                     <button
                       onClick={() => moveImageUp(index)}
-                      disabled={index === 0 || isCompressing}
+                      disabled={index === 0 || isProcessing}
                       className={`p-2 sm:p-1.5 rounded-full shadow-lg transition-all duration-150 touch-manipulation ${
                         index === 0 
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
@@ -321,7 +306,7 @@ export default function ImageUploader({ onImageUpload, multipleImages = false, m
                     </button>
                     <button
                       onClick={() => moveImageDown(index)}
-                      disabled={index === previews.length - 1 || isCompressing}
+                      disabled={index === previews.length - 1 || isProcessing}
                       className={`p-2 sm:p-1.5 rounded-full shadow-lg transition-all duration-150 touch-manipulation ${
                         index === previews.length - 1
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
@@ -338,14 +323,14 @@ export default function ImageUploader({ onImageUpload, multipleImages = false, m
                   onClick={() => removeImage(index)}
                   className="absolute top-3 right-3 p-2 sm:p-1.5 bg-white/90 backdrop-blur-sm text-red-600 rounded-full hover:bg-red-600 hover:text-white transition-all duration-150 shadow-lg opacity-100 sm:opacity-0 sm:group-hover:opacity-100 touch-manipulation active:scale-95"
                   title="Remove image"
-                  disabled={isCompressing}
+                  disabled={isProcessing}
                 >
                   <X className="w-5 h-5 sm:w-4 sm:h-4" />
                 </button>
               </div>
             ))}
           </div>
-          {multipleImages && previews.length < maxImages && !isCompressing && (
+          {multipleImages && previews.length < maxImages && !isProcessing && (
             <div className="text-center pt-2">
               <input
                 type="file"
@@ -364,7 +349,7 @@ export default function ImageUploader({ onImageUpload, multipleImages = false, m
               </label>
             </div>
           )}
-          {isCompressing && (
+          {isProcessing && (
             <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-800 font-medium">
                 📁 Processing images for upload...
